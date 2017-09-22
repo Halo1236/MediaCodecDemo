@@ -41,7 +41,7 @@ public class FileStreamThread extends Thread {
     private int FrameRate = 15;
     private MediaFormat mediaFormat;
 
-    public FileStreamThread(String path, SurfaceHolder holder) {
+    public FileStreamThread(SurfaceHolder holder, String path) {
         this.path = path;
         this.holder = holder;
         this.width = holder.getSurfaceFrame().width();

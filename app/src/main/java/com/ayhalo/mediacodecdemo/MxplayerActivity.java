@@ -18,7 +18,7 @@ public class MxplayerActivity extends AppCompatActivity implements SurfaceHolder
     private SurfaceHolder surfaceHolder;
 
     //读取文件解码线程
-    private FileStreamThread thread;
+    private FileAVC1Thread thread;
     private ImageView imageView;
 
     @Override
@@ -38,7 +38,7 @@ public class MxplayerActivity extends AppCompatActivity implements SurfaceHolder
     public void surfaceCreated(SurfaceHolder holder) {
         if (thread == null) {
             //解码线程第一次初始化
-            thread = new FileStreamThread(videoPath,holder);
+            thread = new FileAVC1Thread(holder,videoPath);
             thread.start();
             imageView.setImageResource(R.drawable.ic_stop_white_24dp);
         }
@@ -51,31 +51,26 @@ public class MxplayerActivity extends AppCompatActivity implements SurfaceHolder
 
     @Override
     public void surfaceDestroyed(SurfaceHolder holder) {
-        if (thread != null && thread.isAlive()) {
-            thread.stopThread();
-            thread = null;
-        }
+
     }
 
     @Override
     public void onBackPressed() {
-        if (thread != null && thread.isAlive()) {
-            thread.stopThread();
-            thread = null;
-        }
-        super.onBackPressed();
     }
 
     @Override
     public void onClick(View v) {
         switch (v.getId()){
             case R.id.app_video_play:
-                if (thread.isFinish){
-                    imageView.setImageResource(R.drawable.ic_stop_white_24dp);
-                    thread.isFinish = false;
-                }else {
-                    imageView.setImageResource(R.drawable.ic_play_arrow_white_24dp);
-                    thread.isFinish = true;
+                switch (thread.state){
+                    case 1:
+                        imageView.setImageResource(R.drawable.ic_stop_white_24dp);
+                        thread.pausePlayer();
+                        break;
+                    case 0:
+                        imageView.setImageResource(R.drawable.ic_play_arrow_white_24dp);
+                        thread.startPlayer();
+                        break;
                 }
                 break;
         }
