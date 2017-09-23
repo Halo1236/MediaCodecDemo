@@ -53,7 +53,7 @@ public class MainActivity extends AppCompatActivity {
         videoAdapter.setOnItemClickListener(new VideoListAdapter.OnItemClickListener() {
             @Override
             public void onItemClick(View view, int position) {
-                Intent intent = new Intent(getApplicationContext(), FileAVC1Thread.class);
+                Intent intent = new Intent(getApplicationContext(), MxplayerActivity.class);
                 intent.putExtra("path", beanList.get(position).getPath());
                 Log.d(TAG, "onItemClick: " + beanList.get(position).getPath());
                 startActivity(intent);

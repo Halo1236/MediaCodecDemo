@@ -18,7 +18,9 @@ public class MxplayerActivity extends AppCompatActivity implements SurfaceHolder
     private SurfaceHolder surfaceHolder;
 
     //读取文件解码线程
-    private FileAVC1Thread thread;
+    private ReadThread mThread = null;
+    private FileAVCOneThread AVCThread = null;
+    private FileStreamThread streamThread = null;
     private ImageView imageView;
 
     @Override
@@ -28,7 +30,7 @@ public class MxplayerActivity extends AppCompatActivity implements SurfaceHolder
         Intent mIntent = getIntent();
         videoPath = mIntent.getStringExtra("path");
         video = (SurfaceView) findViewById(R.id.video_view);
-        imageView = (ImageView)findViewById(R.id.app_video_play);
+        imageView = (ImageView) findViewById(R.id.app_video_play);
         surfaceHolder = video.getHolder();
         surfaceHolder.addCallback(this);
         imageView.setOnClickListener(this);
@@ -36,12 +38,20 @@ public class MxplayerActivity extends AppCompatActivity implements SurfaceHolder
 
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
-        if (thread == null) {
-            //解码线程第一次初始化
-            thread = new FileAVC1Thread(holder,videoPath);
-            thread.start();
-            imageView.setImageResource(R.drawable.ic_stop_white_24dp);
+        //解码线程第一次初始化
+        if (videoPath.endsWith(".h264")) {
+            mThread = new FileStreamThread(holder, videoPath);
+            //streamThread = new FileStreamThread(holder, videoPath);
+            //streamThread.start();
+            //flag = H264_WITH_STARTCODE;
+        } else {
+            mThread = new FileAVCOneThread(holder, videoPath);
+            //AVCThread = new FileAVCOneThread(holder, videoPath);
+            //AVCThread.start();
+            //flag = H264_WITHOUTH_STARTCODE;
         }
+        mThread.start();
+        imageView.setImageResource(R.drawable.ic_stop_white_24dp);
     }
 
     @Override
@@ -51,26 +61,35 @@ public class MxplayerActivity extends AppCompatActivity implements SurfaceHolder
 
     @Override
     public void surfaceDestroyed(SurfaceHolder holder) {
-
+        mThread.stopCodec();
     }
 
     @Override
     public void onBackPressed() {
+        mThread.stopCodec();
+        super.onBackPressed();
     }
+
+//    public void stop() {
+//        if (flag == H264_WITH_STARTCODE) {
+//            streamThread.stopCodec();
+//        } else {
+//            AVCThread.stopCodec();
+//        }
+//        mThread.stopCodec();
+//    }
 
     @Override
     public void onClick(View v) {
-        switch (v.getId()){
+        switch (v.getId()) {
             case R.id.app_video_play:
-                switch (thread.state){
-                    case 1:
-                        imageView.setImageResource(R.drawable.ic_stop_white_24dp);
-                        thread.pausePlayer();
-                        break;
-                    case 0:
-                        imageView.setImageResource(R.drawable.ic_play_arrow_white_24dp);
-                        thread.startPlayer();
-                        break;
+                if (mThread.isPause) {
+                    imageView.setImageResource(R.drawable.ic_stop_white_24dp);
+                    mThread.pausePlayer();
+                } else {
+                    imageView.setImageResource(R.drawable.ic_play_arrow_white_24dp);
+                    mThread.startPlayer();
+                    break;
                 }
                 break;
         }

@@ -2,6 +2,7 @@ package com.ayhalo.mediacodecdemo;
 
 import android.media.MediaCodec;
 import android.media.MediaFormat;
+import android.util.Log;
 import android.view.SurfaceHolder;
 
 import java.io.File;
@@ -15,8 +16,8 @@ import java.util.Arrays;
  * Created by Halo on 2017/9/21.
  */
 
-public class FileStreamThread extends Thread {
-    private static final String TAG = "FileThread";
+public class FileStreamThread extends ReadThread {
+    private static final String TAG = "FileStreamThread";
 
     //文件路径
     private String path;
@@ -29,7 +30,6 @@ public class FileStreamThread extends Thread {
     private static int FRAME_MAX_LEN = 300 * 1024;
     //根据帧率获取的解码每帧需要休眠的时间,根据实际帧率进行操作
     private int PRE_FRAME_TIME = 1000 / 25;
-
 
     // 需要解码的类型
     private final static String MIME_TYPE = "video/avc"; // H.264 Advanced Video
@@ -161,12 +161,16 @@ public class FileStreamThread extends Thread {
         //初始化MediaFormat
         mediaFormat = MediaFormat.createVideoFormat(MIME_TYPE, width, height);
         //获取h264中的pps及sps数据
-        byte[] header_sps = {0, 0, 0, 1, 103, 100, 0, 40, -84, 52, -59, 1, -32, 17, 31, 120, 11, 80, 16, 16, 31, 0, 0, 3, 3, -23, 0, 0, -22, 96, -108};
-        byte[] header_pps = {0, 0, 0, 1, 104, -18, 60, -128};
-        mediaFormat.setByteBuffer("csd-0", ByteBuffer.wrap(header_sps));
-        mediaFormat.setByteBuffer("csd-1", ByteBuffer.wrap(header_pps));
+        //byte[] header_sps = {0, 0, 0, 1, 103, 100, 0, 40, -84, 52, -59, 1, -32, 17, 31, 120, 11, 80, 16, 16, 31, 0, 0, 3, 3, -23, 0, 0, -22, 96, -108};
+        //byte[] header_pps = {0, 0, 0, 1, 104, -18, 60, -128};
+        //mediaFormat.setByteBuffer("csd-0", ByteBuffer.wrap(header_sps));
+        //mediaFormat.setByteBuffer("csd-1", ByteBuffer.wrap(header_pps));
         mediaFormat.setInteger(MediaFormat.KEY_FRAME_RATE, FrameRate);
         mCodec.configure(mediaFormat, holder.getSurface(), null, 0);
+        if (mCodec == null) {
+            Log.e(TAG, "Can't find video info!");
+        }
+        mCodec.start();
     }
 
     //视频解码
@@ -177,7 +181,7 @@ public class FileStreamThread extends Thread {
         MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
         //返回一个可用来填充有效数据的inputbuffer的索引（Index)
         //-1表示一直等待；0表示不等待；其他大于0的参数表示等待毫秒数
-        int inputBufferIndex = mCodec.dequeueInputBuffer(10000);
+        int inputBufferIndex = mCodec.dequeueInputBuffer(-1);
         if (inputBufferIndex >= 0) {
             ByteBuffer inputBuffer = inputBuffers[inputBufferIndex];
             inputBuffer.clear();
@@ -213,18 +217,15 @@ public class FileStreamThread extends Thread {
     }
 
     public void stopCodec() {
-        try {
-            mCodec.stop();
-            mCodec.release();
-            mCodec = null;
-        } catch (Exception e) {
-            e.printStackTrace();
-            mCodec = null;
-        }
-    }
-    //手动终止读取文件，结束线程
-    public void stopThread() {
-        stopCodec();
         isFinish = true;
+        if (mCodec != null) {
+            try {
+                mCodec.stop();
+                mCodec.release();
+                mCodec = null;
+            }catch (Exception e){
+                Log.d(TAG, "stopCodec: "+e);
+            }
+        }
     }
 }
