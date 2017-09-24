@@ -10,8 +10,6 @@ import android.widget.ImageView;
 
 public class MxplayerActivity extends AppCompatActivity implements SurfaceHolder.Callback, View.OnClickListener {
 
-    public static final int H264_WITH_STARTCODE = 1;
-    public static final int H264_WITHOUTH_STARTCODE = 2;
     private static final String TAG = "Mxplayer";
     private String videoPath;
     private SurfaceView video;
@@ -19,8 +17,6 @@ public class MxplayerActivity extends AppCompatActivity implements SurfaceHolder
 
     //读取文件解码线程
     private ReadThread mThread = null;
-    private FileAVCOneThread AVCThread = null;
-    private FileStreamThread streamThread = null;
     private ImageView imageView;
 
     @Override
@@ -38,17 +34,10 @@ public class MxplayerActivity extends AppCompatActivity implements SurfaceHolder
 
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
-        //解码线程第一次初始化
         if (videoPath.endsWith(".h264")) {
             mThread = new FileStreamThread(holder, videoPath);
-            //streamThread = new FileStreamThread(holder, videoPath);
-            //streamThread.start();
-            //flag = H264_WITH_STARTCODE;
         } else {
             mThread = new FileAVCOneThread(holder, videoPath);
-            //AVCThread = new FileAVCOneThread(holder, videoPath);
-            //AVCThread.start();
-            //flag = H264_WITHOUTH_STARTCODE;
         }
         mThread.start();
         imageView.setImageResource(R.drawable.ic_stop_white_24dp);
@@ -70,25 +59,17 @@ public class MxplayerActivity extends AppCompatActivity implements SurfaceHolder
         super.onBackPressed();
     }
 
-//    public void stop() {
-//        if (flag == H264_WITH_STARTCODE) {
-//            streamThread.stopCodec();
-//        } else {
-//            AVCThread.stopCodec();
-//        }
-//        mThread.stopCodec();
-//    }
 
     @Override
     public void onClick(View v) {
         switch (v.getId()) {
             case R.id.app_video_play:
-                if (mThread.isPause) {
+                if (mThread.getPauseState()) {
                     imageView.setImageResource(R.drawable.ic_stop_white_24dp);
-                    mThread.pausePlayer();
+                    mThread.startPlayer();
                 } else {
                     imageView.setImageResource(R.drawable.ic_play_arrow_white_24dp);
-                    mThread.startPlayer();
+                    mThread.pausePlayer();
                     break;
                 }
                 break;

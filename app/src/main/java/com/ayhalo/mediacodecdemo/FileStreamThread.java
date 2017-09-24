@@ -24,6 +24,7 @@ public class FileStreamThread extends ReadThread {
 
     //文件读取完成标识
     public boolean isFinish = false;
+    public boolean isPause = false;
     //这个值用于找到第一个帧头后，继续寻找第二个帧头，如果解码失败可以尝试缩小这个值
     private int FRAME_MIN_LEN = 1024;
     //一般H264帧大小不超过200k,如果解码失败可以尝试增大这个值
@@ -67,6 +68,16 @@ public class FileStreamThread extends ReadThread {
                 long startTime = System.currentTimeMillis();
                 //循环读取数据
                 while (!isFinish) {
+                    synchronized (this){
+                        if (isPause){
+                            try {
+                                Log.d(TAG, "run: wait!");
+                                wait();
+                            } catch (InterruptedException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    }
                     if (fis.available() > 0) {
                         int readLen = fis.read(readData);
                         //当前长度小于最大值
@@ -112,7 +123,6 @@ public class FileStreamThread extends ReadThread {
 
     /**
      * 寻找指定buffer中h264头的开始位置
-     *
      * @param data   数据
      * @param offset 偏移量
      * @param max    需要检测的最大值
@@ -179,9 +189,7 @@ public class FileStreamThread extends ReadThread {
         ByteBuffer[] inputBuffers = mCodec.getInputBuffers();
         // 获取输出buffer index
         MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
-        //返回一个可用来填充有效数据的inputbuffer的索引（Index)
-        //-1表示一直等待；0表示不等待；其他大于0的参数表示等待毫秒数
-        int inputBufferIndex = mCodec.dequeueInputBuffer(-1);
+        int inputBufferIndex = mCodec.dequeueInputBuffer(10000);
         if (inputBufferIndex >= 0) {
             ByteBuffer inputBuffer = inputBuffers[inputBufferIndex];
             inputBuffer.clear();
@@ -195,8 +203,12 @@ public class FileStreamThread extends ReadThread {
         for (; ; ) {
             //循环解码，直到数据全部解码完成
             if (outputBufferIndex >= 0) {
-                mCodec.releaseOutputBuffer(outputBufferIndex, true);
-                outputBufferIndex = mCodec.dequeueOutputBuffer(bufferInfo, 0);
+                try {
+                    mCodec.releaseOutputBuffer(outputBufferIndex, true);
+                    outputBufferIndex = mCodec.dequeueOutputBuffer(bufferInfo, 0);
+                } catch (Exception e) {
+                    Log.d(TAG, "run: " + e);
+                }
             } else {
                 break;
             }
@@ -216,6 +228,7 @@ public class FileStreamThread extends ReadThread {
         }
     }
 
+    @Override
     public void stopCodec() {
         isFinish = true;
         if (mCodec != null) {
@@ -227,5 +240,25 @@ public class FileStreamThread extends ReadThread {
                 Log.d(TAG, "stopCodec: "+e);
             }
         }
+    }
+
+    @Override
+    public boolean getPauseState() {
+        return this.isPause;
+    }
+
+    @Override
+    public void startPlayer() {
+        synchronized (this){
+            if (isPause){
+                isPause = false;
+                notify();
+            }
+        }
+    }
+
+    @Override
+    public void pausePlayer() {
+        isPause = true;
     }
 }

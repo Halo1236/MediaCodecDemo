@@ -5,12 +5,13 @@ package com.ayhalo.mediacodecdemo;
  *         2017 2017/9/23 18:37.
  */
 
-public class ReadThread extends Thread {
-    public boolean isPause;
+public abstract class ReadThread extends Thread {
 
-    public void startPlayer(){}
+    public abstract void startPlayer();
 
-    public void pausePlayer(){}
+    public abstract void pausePlayer();
 
-    public void stopCodec(){}
+    public abstract void stopCodec();
+
+    public abstract boolean getPauseState();
 }

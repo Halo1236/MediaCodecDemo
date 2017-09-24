@@ -23,8 +23,8 @@ public class FileAVCOneThread extends ReadThread {
     private MediaExtractor extractor;
     private MediaCodec mCodec;
     private SurfaceHolder holder;
-    //public boolean isPause = false;
     private boolean isFinish = false;
+    private boolean isPause = false;
 
     public FileAVCOneThread(SurfaceHolder holder, String path) {
         this.holder = holder;
@@ -33,6 +33,58 @@ public class FileAVCOneThread extends ReadThread {
 
     @Override
     public void run() {
+        initMediaCodec();
+        ByteBuffer[] inputBuffers = mCodec.getInputBuffers();
+        MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
+        long startMs = System.currentTimeMillis();
+
+        while (!isFinish) {
+            synchronized (this) {
+                if (isPause) {
+                    try {
+                        Log.d(TAG, "run: wait!");
+                        wait();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+            int inIndex = mCodec.dequeueInputBuffer(10000);
+            if (inIndex >= 0) {
+                ByteBuffer buffer = inputBuffers[inIndex];
+                int sampleSize = extractor.readSampleData(buffer, 0);
+                if (sampleSize < 0) {
+                    Log.d(TAG, "InputBuffer BUFFER_FLAG_END_OF_STREAM");
+                    mCodec.queueInputBuffer(inIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+                    isFinish = true;
+                    break;
+                } else {
+                    mCodec.queueInputBuffer(inIndex, 0, sampleSize, extractor.getSampleTime(), 0);
+                    extractor.advance();
+                }
+            }
+
+            int outIndex = mCodec.dequeueOutputBuffer(info, 10000);
+            if (outIndex >= 0) {
+                while (info.presentationTimeUs / 1000 > System.currentTimeMillis() - startMs) {
+                    try {
+                        sleep(100);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                        break;
+                    }
+                }
+                try {
+                    mCodec.releaseOutputBuffer(outIndex, true);
+                } catch (Exception e) {
+                    Log.d(TAG, "run: " + e);
+                }
+            }
+        }
+        stopCodec();
+    }
+
+    private void initMediaCodec() {
         try {
             extractor = new MediaExtractor();
             extractor.setDataSource(path);
@@ -51,57 +103,13 @@ public class FileAVCOneThread extends ReadThread {
         }
 
         if (mCodec == null) {
-            Log.e("DecodeActivity", "Can't find video info!");
+            Log.e(TAG, "Can't find video info!");
             return;
         }
-
         mCodec.start();
-
-        ByteBuffer[] inputBuffers = mCodec.getInputBuffers();
-        MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
-        long startMs = System.currentTimeMillis();
-
-        while (!isFinish) {
-            int inIndex = mCodec.dequeueInputBuffer(10000);
-            if (inIndex >= 0) {
-                ByteBuffer buffer = inputBuffers[inIndex];
-                int sampleSize = extractor.readSampleData(buffer, 0);
-                if (sampleSize < 0) {
-                    Log.d(TAG, "InputBuffer BUFFER_FLAG_END_OF_STREAM");
-                    mCodec.queueInputBuffer(inIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
-                    isFinish = true;
-                } else {
-                    mCodec.queueInputBuffer(inIndex, 0, sampleSize, extractor.getSampleTime(), 0);
-                    extractor.advance();
-                }
-            }
-
-            int outIndex = mCodec.dequeueOutputBuffer(info, 10000);
-            if (outIndex >= 0) {
-                while (info.presentationTimeUs / 1000 > System.currentTimeMillis() - startMs) {
-                    try {
-                        sleep(10);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                        break;
-                    }
-                }
-                try {
-                    mCodec.releaseOutputBuffer(outIndex, true);
-                } catch (Exception e) {
-                    Log.d(TAG, "run: " + e);
-                }
-
-            }
-            // All decoded frames have been rendered, we can stop playing now
-            if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
-                Log.d("DecodeActivity", "OutputBuffer BUFFER_FLAG_END_OF_STREAM");
-                break;
-            }
-        }
-        stopCodec();
     }
 
+    @Override
     public void stopCodec() {
         isFinish = true;
         if (mCodec != null) {
@@ -116,12 +124,24 @@ public class FileAVCOneThread extends ReadThread {
         }
     }
 
-    public void startPlayer() {
-        isPause = false;
-        notify();
+    @Override
+    public boolean getPauseState() {
+        return this.isPause;
     }
 
+    @Override
+    public void startPlayer() {
+        synchronized (this) {
+            if (isPause) {
+                isPause = false;
+                notify();
+            }
+        }
+    }
+
+    @Override
     public void pausePlayer() {
         isPause = true;
     }
+
 }
