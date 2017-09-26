@@ -5,7 +5,6 @@ import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
 import android.os.AsyncTask;
 import android.os.Bundle;
-import android.os.Environment;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
@@ -36,8 +35,8 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         initView();
-        rootPath = Environment.getExternalStorageDirectory().getAbsolutePath();
-        //rootPath = "/udisk2";
+        //rootPath = Environment.getExternalStorageDirectory().getAbsolutePath();
+        rootPath = "/udisk2";
         Log.d(TAG, rootPath);
         //checkMediaDecoder();
         new MyTask(rootPath).executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
@@ -85,7 +84,6 @@ public class MainActivity extends AppCompatActivity {
                 empty_rel.setVisibility(View.GONE);
             } else {
                 empty_rel.setVisibility(View.VISIBLE);
-                Log.d(TAG, "onPostExecute: " + beanList.size());
             }
             Log.d(TAG, "onPostExecute: " + beanList.size());
             videoAdapter.notifyDataSetChanged();
@@ -126,7 +124,6 @@ public class MainActivity extends AppCompatActivity {
         sMediaExtSet.add("mp4");
         sMediaExtSet.add("h264");
         sMediaExtSet.add("avi");
-        sMediaExtSet.add("rmvb");
     }
 
     private void checkMediaDecoder() {

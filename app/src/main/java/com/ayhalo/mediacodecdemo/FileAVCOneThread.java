@@ -25,6 +25,7 @@ public class FileAVCOneThread extends ReadThread {
     private SurfaceHolder holder;
     private boolean isFinish = false;
     private boolean isPause = false;
+    private boolean isError = false;
 
     public FileAVCOneThread(SurfaceHolder holder, String path) {
         this.holder = holder;
@@ -34,10 +35,7 @@ public class FileAVCOneThread extends ReadThread {
     @Override
     public void run() {
         initMediaCodec();
-        ByteBuffer[] inputBuffers = mCodec.getInputBuffers();
-        MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
         long startMs = System.currentTimeMillis();
-
         while (!isFinish) {
             synchronized (this) {
                 if (isPause) {
@@ -49,6 +47,9 @@ public class FileAVCOneThread extends ReadThread {
                     }
                 }
             }
+
+            ByteBuffer[] inputBuffers = mCodec.getInputBuffers();
+            MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
             int inIndex = mCodec.dequeueInputBuffer(10000);
             if (inIndex >= 0) {
                 ByteBuffer buffer = inputBuffers[inIndex];
@@ -68,7 +69,7 @@ public class FileAVCOneThread extends ReadThread {
             if (outIndex >= 0) {
                 while (info.presentationTimeUs / 1000 > System.currentTimeMillis() - startMs) {
                     try {
-                        sleep(100);
+                        Thread.sleep(100);
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                         break;
@@ -90,6 +91,7 @@ public class FileAVCOneThread extends ReadThread {
             extractor.setDataSource(path);
             for (int i = 0; i < extractor.getTrackCount(); i++) {
                 MediaFormat format = extractor.getTrackFormat(i);
+                Log.d(TAG, "initMediaCodec: "+format);
                 String mime = format.getString(MediaFormat.KEY_MIME);
                 Log.d(TAG, "run: " + mime);
                 if (mime.startsWith("video/")) {
@@ -99,11 +101,11 @@ public class FileAVCOneThread extends ReadThread {
                 }
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.e(TAG, "initMediaCodec: "+e);
+            isError = true;
         }
-
         if (mCodec == null) {
-            Log.e(TAG, "Can't find video info!");
+            isFinish = true;
             return;
         }
         mCodec.start();
@@ -112,6 +114,11 @@ public class FileAVCOneThread extends ReadThread {
     @Override
     public void stopCodec() {
         isFinish = true;
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
         if (mCodec != null) {
             try {
                 mCodec.stop();
@@ -119,20 +126,28 @@ public class FileAVCOneThread extends ReadThread {
                 extractor.release();
                 mCodec = null;
             } catch (Exception e) {
-                Log.d(TAG, "stopCodec: " + e);
+                Log.e(TAG, "stopCodec: " + e);
             }
         }
     }
 
     @Override
-    public boolean getPauseState() {
-        return this.isPause;
+    public int getPlayerState() {
+        if (isError){
+            return PLAYER_STATE_ERROR;
+        }else if (isFinish){
+            return PLAYER_STATE_FINISHED;
+        }else if (isPause){
+            return PLAYER_STATE_PAUSED;
+        }else {
+            return PLAYER_STATE_PLAYING;
+        }
     }
 
     @Override
     public void startPlayer() {
-        synchronized (this) {
-            if (isPause) {
+        synchronized (this){
+            if (isPause){
                 isPause = false;
                 notify();
             }

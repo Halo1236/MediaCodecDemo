@@ -7,11 +7,19 @@ package com.ayhalo.mediacodecdemo;
 
 public abstract class ReadThread extends Thread {
 
-    public abstract void startPlayer();
+    public static final int PLAYER_STATE_PLAYING = 1;
 
-    public abstract void pausePlayer();
+    public static final int PLAYER_STATE_FINISHED = 2;
 
-    public abstract void stopCodec();
+    public static final int PLAYER_STATE_PAUSED = 3;
 
-    public abstract boolean getPauseState();
+    public static final int PLAYER_STATE_ERROR = 4;
+
+    abstract void startPlayer();
+
+    abstract void pausePlayer();
+
+    abstract void stopCodec();
+
+    abstract int getPlayerState();
 }

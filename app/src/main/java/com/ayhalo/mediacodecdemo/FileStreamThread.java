@@ -21,10 +21,12 @@ public class FileStreamThread extends ReadThread {
 
     //文件路径
     private String path;
-
+    private FileInputStream fis = null;
     //文件读取完成标识
-    public boolean isFinish = false;
-    public boolean isPause = false;
+    private boolean isFinish = false;
+    private boolean isPause = false;
+    private boolean isError = false;
+
     //这个值用于找到第一个帧头后，继续寻找第二个帧头，如果解码失败可以尝试缩小这个值
     private int FRAME_MIN_LEN = 1024;
     //一般H264帧大小不超过200k,如果解码失败可以尝试增大这个值
@@ -32,12 +34,10 @@ public class FileStreamThread extends ReadThread {
     //根据帧率获取的解码每帧需要休眠的时间,根据实际帧率进行操作
     private int PRE_FRAME_TIME = 1000 / 25;
 
-    // 需要解码的类型
     private final static String MIME_TYPE = "video/avc"; // H.264 Advanced Video
     private int mCount = 0;
     private SurfaceHolder holder;
     private int width, height;
-    //解码器
     private MediaCodec mCodec;
     private int FrameRate = 15;
     private MediaFormat mediaFormat;
@@ -49,7 +49,6 @@ public class FileStreamThread extends ReadThread {
         this.height = holder.getSurfaceFrame().height();
     }
 
-
     @Override
     public void run() {
         initMediaCodec();
@@ -57,7 +56,7 @@ public class FileStreamThread extends ReadThread {
         //判断文件是否存在
         if (file.exists()) {
             try {
-                FileInputStream fis = new FileInputStream(file);
+                fis = new FileInputStream(file);
                 //保存完整数据帧
                 byte[] frame = new byte[FRAME_MAX_LEN];
                 //当前帧长度
@@ -68,8 +67,8 @@ public class FileStreamThread extends ReadThread {
                 long startTime = System.currentTimeMillis();
                 //循环读取数据
                 while (!isFinish) {
-                    synchronized (this){
-                        if (isPause){
+                    synchronized (this) {
+                        if (isPause) {
                             try {
                                 Log.d(TAG, "run: wait!");
                                 wait();
@@ -113,6 +112,7 @@ public class FileStreamThread extends ReadThread {
                     } else {
                         isFinish = true;
                         stopCodec();
+                        break;
                     }
                 }
             } catch (Exception e) {
@@ -123,6 +123,7 @@ public class FileStreamThread extends ReadThread {
 
     /**
      * 寻找指定buffer中h264头的开始位置
+     *
      * @param data   数据
      * @param offset 偏移量
      * @param max    需要检测的最大值
@@ -161,12 +162,13 @@ public class FileStreamThread extends ReadThread {
         return result;
     }
 
-    private void initMediaCodec(){
+    private void initMediaCodec() {
+        //根据需要解码的类型创建解码器
         try {
-            //根据需要解码的类型创建解码器
             mCodec = MediaCodec.createDecoderByType(MIME_TYPE);
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.e(TAG, "initMediaCodec: " + e);
+            isError = true;
         }
         //初始化MediaFormat
         mediaFormat = MediaFormat.createVideoFormat(MIME_TYPE, width, height);
@@ -178,7 +180,8 @@ public class FileStreamThread extends ReadThread {
         mediaFormat.setInteger(MediaFormat.KEY_FRAME_RATE, FrameRate);
         mCodec.configure(mediaFormat, holder.getSurface(), null, 0);
         if (mCodec == null) {
-            Log.e(TAG, "Can't find video info!");
+            isFinish = true;
+            return;
         }
         mCodec.start();
     }
@@ -231,26 +234,40 @@ public class FileStreamThread extends ReadThread {
     @Override
     public void stopCodec() {
         isFinish = true;
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
         if (mCodec != null) {
             try {
                 mCodec.stop();
                 mCodec.release();
+                fis.close();
                 mCodec = null;
-            }catch (Exception e){
-                Log.d(TAG, "stopCodec: "+e);
+            } catch (Exception e) {
+                Log.d(TAG, "stopCodec: " + e);
             }
         }
     }
 
     @Override
-    public boolean getPauseState() {
-        return this.isPause;
+    public int getPlayerState() {
+        if (isError){
+            return PLAYER_STATE_ERROR;
+        }else if (isFinish){
+            return PLAYER_STATE_FINISHED;
+        }else if (isPause){
+            return PLAYER_STATE_PAUSED;
+        }else {
+            return PLAYER_STATE_PLAYING;
+        }
     }
 
     @Override
     public void startPlayer() {
-        synchronized (this){
-            if (isPause){
+        synchronized (this) {
+            if (isPause) {
                 isPause = false;
                 notify();
             }
