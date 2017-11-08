@@ -1,5 +1,6 @@
 package com.ayhalo.mediacodecdemo;
 
+import android.content.Context;
 import android.media.MediaCodec;
 import android.media.MediaFormat;
 import android.util.Log;
@@ -16,8 +17,8 @@ import java.util.Arrays;
  * Created by Halo on 2017/9/21.
  */
 
-public class FileStreamThread extends ReadThread {
-    private static final String TAG = "FileStreamThread";
+public class FileStream extends ReadThread {
+    private static final String TAG = "FileStream";
 
     //文件路径
     private String path;
@@ -41,17 +42,19 @@ public class FileStreamThread extends ReadThread {
     private MediaCodec mCodec;
     private int FrameRate = 15;
     private MediaFormat mediaFormat;
+    private Context context;
 
-    public FileStreamThread(SurfaceHolder holder, String path) {
+    public FileStream(Context context,SurfaceHolder holder, String path) {
         this.path = path;
         this.holder = holder;
         this.width = holder.getSurfaceFrame().width();
         this.height = holder.getSurfaceFrame().height();
+        this.context = context;
+        this.start();
     }
 
     @Override
     public void run() {
-        initMediaCodec();
         File file = new File(path);
         //判断文件是否存在
         if (file.exists()) {
@@ -62,7 +65,7 @@ public class FileStreamThread extends ReadThread {
                 //当前帧长度
                 int frameLen = 0;
                 //每次从文件读取的数据
-                byte[] readData = new byte[10 * 1024];
+                byte[] readData = new byte[100 * 1024];
                 //开始时间
                 long startTime = System.currentTimeMillis();
                 //循环读取数据
@@ -111,24 +114,15 @@ public class FileStreamThread extends ReadThread {
                         }
                     } else {
                         isFinish = true;
-                        stopCodec();
                         break;
                     }
                 }
             } catch (Exception e) {
-                e.printStackTrace();
+                Log.d(TAG, "run: " + e);
             }
         }
     }
 
-    /**
-     * 寻找指定buffer中h264头的开始位置
-     *
-     * @param data   数据
-     * @param offset 偏移量
-     * @param max    需要检测的最大值
-     * @return h264头的开始位置 ,-1表示未发现
-     */
     private int findHead(byte[] data, int offset, int max) {
         int i;
         for (i = offset; i <= max; i++) {
@@ -143,10 +137,6 @@ public class FileStreamThread extends ReadThread {
         return i;
     }
 
-    /**
-     * 00 00 00 01
-     * 00 00 01
-     */
     private boolean isHead(byte[] data, int offset) {
         boolean result = false;
         // 00 00 00 01 x
@@ -170,13 +160,8 @@ public class FileStreamThread extends ReadThread {
             Log.e(TAG, "initMediaCodec: " + e);
             isError = true;
         }
-        //初始化MediaFormat
         mediaFormat = MediaFormat.createVideoFormat(MIME_TYPE, width, height);
-        //获取h264中的pps及sps数据
-        //byte[] header_sps = {0, 0, 0, 1, 103, 100, 0, 40, -84, 52, -59, 1, -32, 17, 31, 120, 11, 80, 16, 16, 31, 0, 0, 3, 3, -23, 0, 0, -22, 96, -108};
-        //byte[] header_pps = {0, 0, 0, 1, 104, -18, 60, -128};
-        //mediaFormat.setByteBuffer("csd-0", ByteBuffer.wrap(header_sps));
-        //mediaFormat.setByteBuffer("csd-1", ByteBuffer.wrap(header_pps));
+
         mediaFormat.setInteger(MediaFormat.KEY_FRAME_RATE, FrameRate);
         mCodec.configure(mediaFormat, holder.getSurface(), null, 0);
         if (mCodec == null) {
@@ -188,6 +173,9 @@ public class FileStreamThread extends ReadThread {
 
     //视频解码
     private void onFrame(byte[] buf, int offset, int length) {
+        if (mCodec == null){
+            initMediaCodec();
+        }
         // 获取输入buffer index
         ByteBuffer[] inputBuffers = mCodec.getInputBuffers();
         // 获取输出buffer index
@@ -199,7 +187,7 @@ public class FileStreamThread extends ReadThread {
             //put需要解码的数据
             inputBuffer.put(buf, offset, length);
             //解码
-            mCodec.queueInputBuffer(inputBufferIndex, 0, length, mCount * 1000000 / FrameRate, 0);
+            mCodec.queueInputBuffer(inputBufferIndex, 0, length, mCount * 100000 / FrameRate, 0);
             mCount++;
         }
         int outputBufferIndex = mCodec.dequeueOutputBuffer(bufferInfo, 10000);
@@ -276,6 +264,8 @@ public class FileStreamThread extends ReadThread {
 
     @Override
     public void pausePlayer() {
+
         isPause = true;
     }
+
 }

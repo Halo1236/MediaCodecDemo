@@ -1,6 +1,5 @@
 package com.ayhalo.mediacodecdemo;
 
-import android.content.Context;
 import android.content.Intent;
 import android.media.AudioManager;
 import android.os.Bundle;
@@ -9,6 +8,7 @@ import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.ImageView;
 import android.widget.TextView;
 
@@ -28,6 +28,7 @@ public class MxplayerActivity extends AppCompatActivity implements SurfaceHolder
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.mx_player);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         Intent mIntent = getIntent();
         videoPath = mIntent.getStringExtra("path");
         video = (SurfaceView) findViewById(R.id.video_view);
@@ -36,7 +37,6 @@ public class MxplayerActivity extends AppCompatActivity implements SurfaceHolder
         surfaceHolder = video.getHolder();
         surfaceHolder.addCallback(this);
         imageView.setOnClickListener(this);
-        mAudioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
     }
 
     @Override
@@ -52,22 +52,26 @@ public class MxplayerActivity extends AppCompatActivity implements SurfaceHolder
 
     @Override
     public void surfaceDestroyed(SurfaceHolder holder) {
-        mThread.stopCodec();
+
     }
 
     @Override
     public void onBackPressed() {
         mThread.stopCodec();
         super.onBackPressed();
+        finish();
     }
 
     public void initPlayer() {
         if (videoPath.endsWith(".h264")) {
-            mThread = new FileStreamThread(surfaceHolder, videoPath);
-        } else {
-            mThread = new FileAVCOneThread(surfaceHolder, videoPath);
+            mThread = new FileStream(this,surfaceHolder, videoPath);
+        } else if (videoPath.endsWith(".mp4")){
+            mThread = new FileAVCOne(surfaceHolder, videoPath);
+            //ReadData read = new ReadData(videoPath);
+            //read.start();
+        }else if (videoPath.endsWith(".aac")){
+            mThread = new AudioThread(this,videoPath);
         }
-        mThread.start();
     }
 
     @Override
@@ -95,35 +99,4 @@ public class MxplayerActivity extends AppCompatActivity implements SurfaceHolder
                 break;
         }
     }
-
-    private AudioManager.OnAudioFocusChangeListener mAudioFocusChange = new AudioManager.OnAudioFocusChangeListener() {
-        @Override
-        public void onAudioFocusChange(int focusChange) {
-            switch (focusChange) {
-                case AudioManager.AUDIOFOCUS_LOSS:
-                    //长时间丢失焦点
-                    Log.d(TAG, "AUDIOFOCUS_LOSS");
-                    //stop();
-                    //释放焦点
-                    mAudioManager.abandonAudioFocus(mAudioFocusChange);
-                    break;
-                case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
-                    //短暂性失去焦点
-                    Log.d(TAG, "AUDIOFOCUS_LOSS_TRANSIENT");
-                    //stop();
-                    break;
-                case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
-                    //短暂性丢失焦点并作降音处理
-                    Log.d(TAG, "AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK");
-                    //mMediaPlayer.setVolume(0.1f,0.1f);
-                    break;
-                case AudioManager.AUDIOFOCUS_GAIN:
-                    //重新获得焦点
-                    Log.d(TAG, "AUDIOFOCUS_GAIN");
-                    //mMediaPlayer.setVolume(1.0f,1.0f);
-                    //start();
-                    break;
-            }
-        }
-    };
 }
